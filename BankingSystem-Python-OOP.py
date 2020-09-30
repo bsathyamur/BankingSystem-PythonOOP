@@ -869,5 +869,7 @@ try:
             
         else:
             break
-except Exception as e:
-    print("Exception occured while processing.")
+except ValueError as e1:
+    print("Entered input is not a number.")
+except Exception as e2:
+    print("Unhandled exception occured.")
