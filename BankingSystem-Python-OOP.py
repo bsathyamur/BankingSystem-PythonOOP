@@ -780,7 +780,7 @@ while True:
                     if action_choice == 2:
                         result = bank.withdrawAmt(u_id,account_no,trans_amt)
                     if action_choice == 3:
-                        result = bank.showBalance(u_id,account_no,trans_amt)                        
+                        result = bank.showBalance(u_id,account_no,None)                        
                     elif action_choice == 4:
                         result = bank.payBalance(u_id,account_no,trans_amt)
                     else:
