@@ -10,7 +10,7 @@ The class Accounts inherits from parent class Bank.
 
 Once the user runs the program, an object of the class accounts class is instantiated and the user is prompted with two options - employee or customer. 
 
-#### For BANK EMPLOYEE OPTION
+#### FOR BANK EMPLOYEE OPTION
 If the user selects the option as "employee", the following options will be prompted for selection:
 * create new employee user
 * employee login and 
