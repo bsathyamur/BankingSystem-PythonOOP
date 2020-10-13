@@ -11,8 +11,8 @@ class ValidationError(Exception):
         self.message = message
     def __repr__(self):
         return self.message
-    
-class BankingSystem:
+
+class Bank:
     
     global dbUrl
     
@@ -39,7 +39,7 @@ class BankingSystem:
             self.logger.info('closing connection to database')
             connection.close()
             engine.dispose()
-        
+     
     def createUser(self,f_name,l_name,u_type,dsgnation = None)->int:
         """
         Creates a unique user id for employee or customer
@@ -177,78 +177,31 @@ class BankingSystem:
             print(e.message)
             return False
 
-    def validateAccount(self,u_id,account_no,action_choice)->bool:
+class Accounts(Bank):
 
-        """
-        Validate if the account number provided is valid and 
-        returns if a match is found
-
-        Parameters
-        ----------
-        u_id : int
-            user id
-        account_no : string
-            customer account number
-        action_choice : string
-            user selected action - deposit/withdrawal/view balance/pay balance
-
-        Returns
-        -------
-        bool
-            True if successful, False otherwise
-        """
-        self.logger.info("Open validateAccount")
-
-        try:
-            with self.db_connect(dbUrl) as db_engine:
-                acct_cnt = 0
-                metadata = MetaData(bind=db_engine)
-                cust_accounts = Table('cust_accounts', metadata, 
-                                        autoload_with=db_engine)
-                stmt = select([cust_accounts])                        
-                
-                if action_choice == 1:
-                    stmt = stmt.where( or_(cust_accounts.columns.acct_type == 'Checking',
-                                           cust_accounts.columns.acct_type == 'Savings'))
-                    stmt = stmt.where( 
-                                       and_(cust_accounts.columns.user_id == u_id,
-                                           cust_accounts.columns.acct_no == account_no,
-                                           cust_accounts.columns.acct_sts == 'ACTIVE')
-                                     ) 
-                elif action_choice in (2,3):                  
-                    stmt = stmt.where( 
-                                       and_(cust_accounts.columns.user_id == u_id,
-                                           cust_accounts.columns.acct_no == account_no,
-                                           cust_accounts.columns.acct_sts == 'ACTIVE')
-                                     )                     
-                elif action_choice == 4:                  
-                    stmt = stmt.where( or_(cust_accounts.columns.acct_type == 'Loan',
-                                           cust_accounts.columns.acct_type == 'Credit')
-                                     )
-                    stmt = stmt.where(and_(cust_accounts.columns.user_id == u_id,
-                                           cust_accounts.columns.acct_no == account_no,
-                                           cust_accounts.columns.acct_sts == 'ACTIVE')
-                                     )
-                elif  u_id is None:
-                    stmt = stmt.where( 
-                                       and_(cust_accounts.columns.acct_no == account_no,
-                                           cust_accounts.columns.acct_sts == 'ACTIVE')
-                                     )                     
-
-                result = db_engine.execute(stmt).fetchall()
-                acct_cnt = len(result)
-                
-            if acct_cnt == 1:
-                self.logger.info("Close validateAccount")                
-                return True
-            else:
-                raise ValidationError("Validation Error: Account not found")
-                
-        except ValidationError as e:
-            self.logger.info("Exception: validateAccount")            
-            print(e.message)
-            return False
+    def validateTransaction(func):
+        @wraps(func)
         
+        def wrapped(self,u_id,acctno,amt):
+            
+            try:
+                if u_id is not None:
+                    if len(str(u_id)) <= 0:
+                        raise ValidationError("Error: User ID cannot be blank")
+                elif len(str(acctno)) <= 0 or acctno == 0:
+                    raise ValidationError("Error: Account no cannot be blank or zero")
+                elif amt is not None:
+                    if amt <= 0:
+                        raise ValidationError("Error: Transaction amount cannot be negative/zero")
+            
+                return func(self,u_id,acctno,amt)
+            
+            except ValidationError as e:
+                print(e.message)
+                return False
+                
+        return wrapped
+
     def addAccount(self,u_id,f_name,account_type,avail_bal) -> int:
 
         """
@@ -336,31 +289,9 @@ class BankingSystem:
             self.logger.info("Exception: addAccount")                
             print(e.message)
             return -1
-    
-    def validateTransaction(func):
-        @wraps(func)
-        def wrapped(self,u_id,acctno,amt):
-            
-            try:
-                if u_id is not None:
-                    if len(str(u_id)) <= 0:
-                        raise ValidationError("Error: User ID cannot be blank")
-                elif len(str(acctno)) <= 0 or acctno == 0:
-                    raise ValidationError("Error: Account no cannot be blank or zero")
-                elif amt is not None:
-                    if amt <= 0:
-                        raise ValidationError("Error: Transaction amount cannot be negative/zero")
-            
-                return func(self,u_id,acctno,amt)
-            
-            except ValidationError as e:
-                print(e.message)
-                return False
-                
-        return wrapped
                 
     @validateTransaction
-    def depositAmt(self,u_id,acctno,depositAmt) -> bool:
+    def depositAmt(self,u_id : int,acctno : int,depositAmt :  int) -> bool:
         """
         Deposit the amount to the customer account
 
@@ -678,7 +609,7 @@ class BankingSystem:
             return False
 
 try:
-    bank = BankingSystem()
+    bank = Accounts()
     print()
     print("""Enter 
                 1 for Employee
