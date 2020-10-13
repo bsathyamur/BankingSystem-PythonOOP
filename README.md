@@ -30,12 +30,14 @@ If the user selects the option as customer then the user will be requested to lo
 
  All the activity of the program will get logged automatically in a log file bank_transaction_log.log                               
  
- The data is stored in the sqlite database in 2 tables - 
+ The data is stored in the sqlite database in 2 tables - cust_accounts and user as shown below:
 
+![pic2](https://github.com/bsathyamur/BankingSystem-PythonOOP/blob/master/db-tables.png)
 
 ## Instructions for execution
+
 The program can be run from command prompt by executing the below command:
+
 python BankingSystem-Python-OOP.py
 
 The following files should also be present in the same folder - BankingSystem-DB.db
-
