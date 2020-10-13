@@ -4,7 +4,7 @@
 
 The banking system is designed with 2 classes -> Bank and Accounts as represented below:
 
-![pic1](https://github.com/bsathyamur/simulation_project_r_programming/blob/master/fstat-and-val-comp.png)
+![pic1](https://github.com/bsathyamur/BankingSystem-PythonOOP/blob/master/class-diagram.jpeg)
 
 ## Instructions for execution
 The program can be run from command prompt by executing the below command:
