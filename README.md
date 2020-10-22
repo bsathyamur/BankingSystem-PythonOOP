@@ -4,7 +4,7 @@
 
 The banking system is designed with 2 classes -> 1. Bank and 2. Accounts as represented in the below class diagram:
 
-![pic1](https://github.com/bsathyamur/BankingSystem-PythonOOP/blob/master/class-diagram.jpeg)
+![pic1](https://github.com/bsathyamur/BankingSystem-PythonOOP/blob/master/class-diagram.jpg)
 
 The class Accounts inherits from parent class Bank.
 
