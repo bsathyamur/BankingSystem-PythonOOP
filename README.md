@@ -6,8 +6,6 @@ The banking system is designed with 2 classes -> 1. Bank and 2. Accounts as repr
 
 ![pic1](https://github.com/bsathyamur/BankingSystem-PythonOOP/blob/master/class-diagram.jpg)
 
-The class Accounts inherits from parent class Bank.
-
 Once the user runs the program, an object of the class accounts class is instantiated and the user is prompted with two options - employee or customer. 
 
 #### FOR BANK EMPLOYEE OPTION
