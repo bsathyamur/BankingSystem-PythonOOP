@@ -11,12 +11,8 @@ class ValidationError(Exception):
         self.message = message
     def __repr__(self):
         return self.message
-
-class Bank:
     
-    global dbUrl
-    
-    dbUrl = "sqlite:///BankingSystem-DB.db"
+class bankTransactionLog:
     
     def __init__(self):
         # Adding information related to logger
@@ -27,23 +23,39 @@ class Bank:
         self.logger.addHandler(self.fileHandler)
         self.formatter = logging.Formatter('%(asctime)s  %(name)s  %(levelname)s: %(message)s')
         self.fileHandler.setFormatter(self.formatter)
+        
+    def logTransaction(self,info):
+        self.logger.info(info)
+        
+class bankDatabase:
+    
+    global dbUrl 
+    
+    dbUrl = "sqlite:///BankingSystem-DB.db"
+    
+    def __init__(self):
+        self.log = bankTransactionLog()
                     
     @contextmanager
     def db_connect(self,dbURL):
         engine = create_engine(dbUrl)
         try:
-            self.logger.info('opening connection to database')
+            self.log.logTransaction('opening connection to database')
             connection = engine.connect()
             yield connection
         finally:
-            self.logger.info('closing connection to database')
+            self.log.logTransaction('closing connection to database')
             connection.close()
-            engine.dispose()
-     
+            engine.dispose()   
+    
+class bankUser:
+    def __init__(self):
+        self.db =  bankDatabase()
+        self.log = bankTransactionLog()
+        
     def createUser(self,f_name,l_name,u_type,dsgnation = None)->int:
         """
         Creates a unique user id for employee or customer
-
         Parameters
         ----------
         f_name : string
@@ -54,14 +66,13 @@ class Bank:
             user type - E for employee and C for customer
         dsgnation : string
             designation - expected only for employee
-
         Returns
         -------
         int
             user id if successful, -1 otherwise
         """
         
-        self.logger.info("Open createUser")
+        self.log.logTransaction("Open createUser")
 
         try:    
             # Validate input arguments
@@ -81,7 +92,7 @@ class Bank:
             while user_cnt != 0:
                 u_id = randint(1,100000)
             
-                with self.db_connect(dbUrl) as db_engine:
+                with self.db.db_connect(dbUrl) as db_engine:
             
                     # Check if the user id doesn't exist
                     metadata = MetaData(bind=db_engine)
@@ -92,7 +103,7 @@ class Bank:
                     result = db_engine.execute(stmt).fetchall()
                     user_cnt = len(result)
                 
-            with self.db_connect(dbUrl) as db_engine:
+            with self.db.db_connect(dbUrl) as db_engine:
                 metadata = MetaData(bind=db_engine)
                 user = Table('user', metadata, autoload_with=db_engine)
                 
@@ -111,20 +122,19 @@ class Bank:
                 
             # If insert into user id is successful 
             if row_cnt == 1:
-                self.logger.info('Close createUser')                
+                self.log.logTransaction('Close createUser')                
                 return u_id
             else:
                 raise ValidationError("Account creation Failed")
             
         except ValidationError as e:
-            self.logger.info('Exception: CreateUser')
+            self.log.logTransaction('Exception: CreateUser')
             print(e.message)
             return -1
         
     def authenticateUser(self,u_id,u_type,f_name) -> bool:
         """
         Authenticates a user id based on user id and first name values
-
         Parameters
         ----------
         u_id : int
@@ -133,14 +143,13 @@ class Bank:
             user type - E for employee and C for customer
         f_name : string
             first name
-
         Returns
         -------
         bool
             True if successful, False otherwise
         """
 
-        self.logger.info("Open authenticateUser")    
+        self.log.logTransaction("Open authenticateUser")    
 
         try:
             if len(str(u_id)) <= 0:
@@ -150,7 +159,7 @@ class Bank:
                 
             user_cnt = -1
         
-            with self.db_connect(dbUrl) as db_engine:
+            with self.db.db_connect(dbUrl) as db_engine:
             
                 # Check if the user id doesn't exist
                 metadata = MetaData(bind=db_engine)
@@ -167,46 +176,97 @@ class Bank:
                 user_cnt = len(result)
                 
                 if user_cnt == 1:
-                    self.logger.info("Close authenticateUser")                     
+                    self.log.logTransaction("Close authenticateUser")                     
                     return True
                 else:
                     raise ValidationError("Authentication Error: User ID is not valid")
             
         except ValidationError as e:
-            self.logger.info("Exception: authenticateUser")  
+            self.log.logTransaction("Exception: authenticateUser")  
             print(e.message)
             return False
 
-class Accounts(Bank):
+class bankAccounts:
+    
+    def __init__(self):
+        self.db =  bankDatabase()
+        self.log = bankTransactionLog()        
 
-    def validateTransaction(func):
-        @wraps(func)
-        
-        def wrapped(self,u_id,acctno,amt):
-            
-            try:
-                if u_id is not None:
-                    if len(str(u_id)) <= 0:
-                        raise ValidationError("Error: User ID cannot be blank")
-                elif len(str(acctno)) <= 0 or acctno == 0:
-                    raise ValidationError("Error: Account no cannot be blank or zero")
-                elif amt is not None:
-                    if amt <= 0:
-                        raise ValidationError("Error: Transaction amount cannot be negative/zero")
-            
-                return func(self,u_id,acctno,amt)
-            
-            except ValidationError as e:
-                print(e.message)
-                return False
+    def validateAccount(self,u_id,account_no,action_choice)->bool:
+        """
+        Validate if the account number provided is valid and 
+        returns if a match is found
+
+        Parameters
+        ----------
+        u_id : int
+            user id
+        account_no : string
+            customer account number
+        action_choice : string
+            user selected action - deposit/withdrawal/view balance/pay balance
+
+        Returns
+        -------
+        bool
+            True if successful, False otherwise
+        """
+        self.log.logTransaction("Open validateAccount")
+
+        try:
+            with self.db.db_connect(dbUrl) as db_engine:
+                acct_cnt = 0
+                metadata = MetaData(bind=db_engine)
+                cust_accounts = Table('cust_accounts', metadata, 
+                                        autoload_with=db_engine)
+                stmt = select([cust_accounts])                        
                 
-        return wrapped
+                if action_choice == 1:
+                    stmt = stmt.where( or_(cust_accounts.columns.acct_type == 'Checking',
+                                           cust_accounts.columns.acct_type == 'Savings'))
+                    stmt = stmt.where( 
+                                       and_(cust_accounts.columns.user_id == u_id,
+                                           cust_accounts.columns.acct_no == account_no,
+                                           cust_accounts.columns.acct_sts == 'ACTIVE')
+                                     ) 
+                elif action_choice in (2,3):                  
+                    stmt = stmt.where( 
+                                       and_(cust_accounts.columns.user_id == u_id,
+                                           cust_accounts.columns.acct_no == account_no,
+                                           cust_accounts.columns.acct_sts == 'ACTIVE')
+                                     )                     
+                elif action_choice == 4:                  
+                    stmt = stmt.where( or_(cust_accounts.columns.acct_type == 'Loan',
+                                           cust_accounts.columns.acct_type == 'Credit')
+                                     )
+                    stmt = stmt.where(and_(cust_accounts.columns.user_id == u_id,
+                                           cust_accounts.columns.acct_no == account_no,
+                                           cust_accounts.columns.acct_sts == 'ACTIVE')
+                                     )
+                elif  u_id is None:
+                    stmt = stmt.where( 
+                                       and_(cust_accounts.columns.acct_no == account_no,
+                                           cust_accounts.columns.acct_sts == 'ACTIVE')
+                                     )                     
+
+                result = db_engine.execute(stmt).fetchall()
+                acct_cnt = len(result)
+                
+            if acct_cnt == 1:
+                self.log.logTransaction("Close validateAccount")                
+                return True
+            else:
+                raise ValidationError("Validation Error: Account not found")
+                
+        except ValidationError as e:
+            self.log.logTransaction("Exception: validateAccount")            
+            print(e.message)
+            return False
 
     def addAccount(self,u_id,f_name,account_type,avail_bal) -> int:
 
         """
         Creates a new customer account
-
         Parameters
         ----------
         u_id : int
@@ -217,14 +277,13 @@ class Accounts(Bank):
             account type
         avail_bal : int
             initial deposit amount or approved credit/loan amount
-
         Returns
         -------
         int
             account number if successful, -1 otherwise
         """
         
-        self.logger.info("Open addAccount")
+        self.log.logTransaction("Open addAccount")
 
         try:    
             # Validate input arguments
@@ -234,7 +293,7 @@ class Accounts(Bank):
                 raise ValidationError("Validation Error: Balance amount cannot be negative/zero")
             else:
                 # Check if the user id and firstname is valid
-                with self.db_connect(dbUrl) as db_engine:
+                with self.db.db_connect(dbUrl) as db_engine:
             
                     # Check if the user id doesn't exist
                     metadata = MetaData(bind=db_engine)
@@ -272,7 +331,7 @@ class Accounts(Bank):
                         row_cnt = result.rowcount
                         
                         if row_cnt == 1:
-                            self.logger.info("Close addAccount")                            
+                            self.log.logTransaction("Close addAccount")                            
                             return account_no
                         else:
                             raise ValidationError("Account creation failed.")
@@ -286,15 +345,43 @@ class Accounts(Bank):
                         raise ValidationError(errmsg)
         
         except ValidationError as e:
-            self.logger.info("Exception: addAccount")                
+            self.log.logTransaction("Exception: addAccount")                
             print(e.message)
             return -1
+        
+        
+class bankTransactions:
+    
+    def __init__(self):
+        self.db =  bankDatabase()  
+        self.log = bankTransactionLog()           
+
+    def validateTransaction(func):
+        @wraps(func)
+        def wrapped(self,u_id,acctno,amt):
+            
+            try:
+                if u_id is not None:
+                    if len(str(u_id)) <= 0:
+                        raise ValidationError("Error: User ID cannot be blank")
+                elif len(str(acctno)) <= 0 or acctno == 0:
+                    raise ValidationError("Error: Account no cannot be blank or zero")
+                elif amt is not None:
+                    if amt <= 0:
+                        raise ValidationError("Error: Transaction amount cannot be negative/zero")
+            
+                return func(self,u_id,acctno,amt)
+            
+            except ValidationError as e:
+                print(e.message)
+                return False
                 
+        return wrapped
+    
     @validateTransaction
     def depositAmt(self,u_id : int,acctno : int,depositAmt :  int) -> bool:
         """
         Deposit the amount to the customer account
-
         Parameters
         ----------
         u_id : int
@@ -303,19 +390,18 @@ class Accounts(Bank):
             account number
         depositAmt : int
             Deposit amount to the account
-
         Returns
         -------
         bool
             True if successful, False otherwise
         """
         
-        self.logger.info("Open depositAmt")   
+        self.log.logTransaction("Open depositAmt")   
 
         try:
             row_cnt = 0
         
-            with self.db_connect(dbUrl) as db_engine:
+            with self.db.db_connect(dbUrl) as db_engine:
                 metadata = MetaData(bind=db_engine)
                 cust_accounts = Table('cust_accounts', metadata, autoload_with=db_engine)
             
@@ -347,7 +433,7 @@ class Accounts(Bank):
                 row_cnt = result.rowcount
             
             if row_cnt != 0:
-                self.logger.info("Close depositAmt")                  
+                self.log.logTransaction("Close depositAmt")                  
                 print("""
                          Amount ${amt} successfully deposited 
                          into the account {acct}, 
@@ -357,7 +443,7 @@ class Accounts(Bank):
             else:
                 raise ValidationError("Error: Deposit transaction failed.")
         except ValidationError as e:
-            self.logger.info("Exception: depositAmt")              
+            self.log.logTransaction("Exception: depositAmt")              
             print(e.message)
             return False           
      
@@ -366,7 +452,6 @@ class Accounts(Bank):
 
         """
         Withdraw amount from the customer account
-
         Parameters
         ----------
         u_id : int
@@ -375,19 +460,18 @@ class Accounts(Bank):
             account number
         withdrawAmt : int
             withdrawal amount from the account
-
         Returns
         -------
         bool
             True if successful, False otherwise
         """        
         
-        self.logger.info("Open withdrawAmt")        
+        self.log.logTransaction("Open withdrawAmt")        
         
         try:
             row_cnt = 0
         
-            with self.db_connect(dbUrl) as db_engine:
+            with self.db.db_connect(dbUrl) as db_engine:
                 metadata = MetaData(bind=db_engine)
                 cust_accounts = Table('cust_accounts', metadata, autoload_with=db_engine)
             
@@ -450,12 +534,12 @@ class Accounts(Bank):
                                     pymt = remain_new_amt)                    
                 
                 print(msg)
-                self.logger.info("Close withdrawAmt")                  
+                self.log.logTransaction("Close withdrawAmt")                  
                 return True
             else:
                 raise ValidationError("Error: Withdrawal transaction failed.")
         except ValidationError as e:
-            self.logger.info("Exception: withdrawAmt")              
+            self.log.logTransaction("Exception: withdrawAmt")              
             print(e.message)
             return False 
     
@@ -463,7 +547,6 @@ class Accounts(Bank):
     def showBalance(self,u_id,acctno,amt = None) -> bool:              
         """
         Show balance amount in the customer account
-
         Parameters
         ----------
         u_id : int
@@ -472,18 +555,17 @@ class Accounts(Bank):
             account number
         amt : int 
             defaulted to None
-
         Returns
         -------
         bool
             True if successful, False otherwise
         """  
-        self.logger.info("Open showBalance")    
+        self.log.logTransaction("Open showBalance")    
 
         try:
             row_cnt = 0
         
-            with self.db_connect(dbUrl) as db_engine:
+            with self.db.db_connect(dbUrl) as db_engine:
                 metadata = MetaData(bind=db_engine)
                 cust_accounts = Table('cust_accounts', metadata, autoload_with=db_engine)
             
@@ -524,21 +606,19 @@ class Accounts(Bank):
                 
                 print(msg)
 
-                self.logger.info("Close showBalance")                    
+                self.log.logTransaction("Close showBalance")                    
                 return True
             else:
                 raise ValidationError("Error: View balance transaction failed.")
         except ValidationError as e:
-            self.logger.info("Exception: showBalance")             
+            self.log.logTransaction("Exception: showBalance")             
             print(e.message)
             return False 
  
-    
     @validateTransaction   
     def payBalance(self,u_id,acctno,paymentAmt) -> bool:              
         """
         Pay balance amount in the credit / loan account
-
         Parameters
         ----------
         u_id : int
@@ -547,19 +627,18 @@ class Accounts(Bank):
             account number
         paymentAmt : int 
             payment amount
-
         Returns
         -------
         bool
             True if successful, False otherwise
         """  
         
-        self.logger.info("Open: payBalance") 
+        self.log.logTransaction("Open: payBalance") 
 
         try:
             row_cnt = 0
         
-            with self.db_connect(dbUrl) as db_engine:
+            with self.db.db_connect(dbUrl) as db_engine:
                 metadata = MetaData(bind=db_engine)
                 cust_accounts = Table('cust_accounts', metadata, autoload_with=db_engine)
             
@@ -599,17 +678,17 @@ class Accounts(Bank):
                                     pymt = remain_new_amt)                    
                 
                 print(msg)
-                self.logger.info("Close: payBalance")                 
+                self.log.logTransaction("Close: payBalance")                 
                 return True
             else:
                 raise ValidationError("Error: payment transaction failed.")
         except ValidationError as e:
-            self.logger.info("Exception: payBalance")              
+            self.log.logTransaction("Exception: payBalance")              
             print(e.message)
             return False
 
+
 try:
-    bank = Accounts()
     print()
     print("""Enter 
                 1 for Employee
@@ -627,7 +706,8 @@ try:
                     3 to exit
                 """)
             empchoice = int(input())
-            
+            bankusr = bankUser()
+
             if empchoice == 1:
                 print()
                 print("Enter First name")
@@ -637,8 +717,8 @@ try:
                 print("Enter Designation")
                 desig = input()
                 user_type = "E"
-                    
-                u_id = bank.createUser(fname,lname,user_type,desig)
+                   
+                u_id = bankusr.createUser(fname,lname,user_type,desig)
                 
                 if u_id != -1:
                     print("Employee User ID successfully created: " + str(u_id))
@@ -650,7 +730,7 @@ try:
                 print("Enter first name")
                 fname = input()
                 user_type = "E"
-                authresult = bank.authenticateUser(user_id,user_type,fname)
+                authresult = bankusr.authenticateUser(user_id,user_type,fname)
                 
                 if authresult:
                     print()
@@ -671,7 +751,7 @@ try:
                         desig = None
                         user_type = "C"
                     
-                        u_id = bank.createUser(fname,lname,user_type,desig)
+                        u_id = bankusr.createUser(fname,lname,user_type,desig)
                 
                         if u_id != -1:
                             print("Customer User ID successfully created: " + str(u_id))
@@ -688,8 +768,9 @@ try:
                                     2 for Credit
                                     3 for checking
                                     4 for Savings
-                            """)
+                            """)                            
                         acct_type = int(input())
+                        acct1 = bankAccounts()
                         
                         if acct_type in (1,2,3,4):
                             print()
@@ -705,8 +786,8 @@ try:
                                 acct = "Checking"                           
                             elif acct_type == 4:
                                 acct = "Savings" 
-                                
-                            acct_no = bank.addAccount(u_id,f_name,acct,avail_bal)
+
+                            acct_no = acct1.addAccount(u_id,f_name,acct,avail_bal)
                             
                             if acct_no != -1:
                                 msg = """
@@ -722,8 +803,10 @@ try:
                         print("""
                                 Enter 1 for Deposit amount
                                       2 for View Balance
-                            """)
+                            """)                            
                         emp_custchoice = int(input())
+                        acct2 = bankAccounts()
+
                         print()
                         print("Enter customer account no")
                         acct_no = int(input())
@@ -732,13 +815,15 @@ try:
                             print("Enter deposit amount")
                             deposit_amt = int(input())
                         
-                        authresult = bank.validateAccount(None,acct_no,None)
+                        authresult = acct2.validateAccount(None,acct_no,None)
+                        
+                        trans = bankTransactions()
 
                         if authresult:
                             if emp_custchoice == 1:                        
-                                result = bank.depositAmt(None,acct_no,deposit_amt)                            
+                                result = trans.depositAmt(None,acct_no,deposit_amt)                            
                             else:
-                                result = bank.showBalance(None,acct_no,None) 
+                                result = trans.showBalance(None,acct_no,None) 
                     else:
                         print("Error: Invalid choice selected.")
             else:
@@ -750,6 +835,8 @@ try:
             print("Enter 2 to exit")
             cust_choice = int(input())
             
+            bankusr2 = bankUser()
+
             if cust_choice == 1:
                 print()
                 print("Enter user id")
@@ -758,7 +845,7 @@ try:
                 f_name = input() 
                 user_type = "C"
                 
-                authresult = bank.authenticateUser(u_id,user_type,f_name)
+                authresult = bankusr2.authenticateUser(u_id,user_type,f_name)
                 
                 if authresult:
                     print()
@@ -781,17 +868,21 @@ try:
                     print("Enter account no")
                     account_no = int(input())
                     
-                    authresult = bank.validateAccount(u_id,account_no,action_choice)
-                    
+                    acct2 = bankAccounts()
+
+                    authresult = acct2.validateAccount(u_id,account_no,action_choice)
+                                        
                     if authresult:
+                        trans2 = bankTransactions()
+
                         if action_choice == 1:                        
-                            result = bank.depositAmt(u_id,account_no,trans_amt)
+                            result = trans2.depositAmt(u_id,account_no,trans_amt)
                         if action_choice == 2:
-                            result = bank.withdrawAmt(u_id,account_no,trans_amt)
+                            result = trans2.withdrawAmt(u_id,account_no,trans_amt)
                         if action_choice == 3:
-                            result = bank.showBalance(u_id,account_no,None)                        
+                            result = trans2.showBalance(u_id,account_no,None)                        
                         elif action_choice == 4:
-                            result = bank.payBalance(u_id,account_no,trans_amt)
+                            result = trans2.payBalance(u_id,account_no,trans_amt)
                         else:
                             result = "Error: Invalid choice selected"
                         
@@ -803,4 +894,4 @@ try:
 except ValueError as e1:
     print("Entered input is not a number.")
 except Exception as e2:
-    print("Unhandled exception occured.")
+    print("unhandled exception occurred")
