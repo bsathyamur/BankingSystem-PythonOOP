@@ -2,7 +2,7 @@
 
 ## CLASS DESIGN AND SYSTEM DESIGN
 
-The banking system is designed with 2 classes -> 1. Bank and 2. Accounts as represented in the below class diagram:
+The banking system is designed with 5 classes -> bankDatabase, bankTransactionLog, bankUser, bankAccounts and bankTransactions as represented in the below class UML diagram:
 
 ![pic1](https://github.com/bsathyamur/BankingSystem-PythonOOP/blob/master/class-diagram.jpg)
 
